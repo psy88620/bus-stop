@@ -41,10 +41,15 @@ async function showLoc(btn) {   // 노선 버스 위치: 목록 + 지도에 버�
   try {
     const buses = await api("/location", { city: stop.city, route: openRoute, stop: stop.id });
     box.innerHTML = buses.length ? buses.slice(0, 3).map((b) => `<p>${b.left === 0 ? "<b>지금 이 정류장</b>" : `<b>${b.left}정류장 전</b> · ${esc(b.name)}`}</p>`).join("") : "이 정류장으로 오는 버스 위치가 아직 없습니다.";
-    if (map) buses.slice(0, 3).forEach((b) => {
-      const el = document.createElement("div"); el.className = "bus-pin"; el.textContent = btn.dataset.no;
-      busOverlays.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(b.lat, b.lng), content: el, zIndex: 6 }));
-    });
+    if (map) {
+      const bounds = new kakao.maps.LatLngBounds(); bounds.extend(new kakao.maps.LatLng(stop.lat, stop.lng));
+      buses.slice(0, 3).forEach((b) => {
+        const el = document.createElement("div"); el.className = "bus-pin"; el.textContent = btn.dataset.no;
+        const p = new kakao.maps.LatLng(b.lat, b.lng); bounds.extend(p);
+        busOverlays.push(new kakao.maps.CustomOverlay({ map, position: p, content: el, zIndex: 6 }));
+      });
+      if (buses.length) map.setBounds(bounds, 50, 50, 50, 50);   // 정류장과 버스가 모두 보이게 (화면 밖 표시는 그려지지 않음)
+    }
   } catch (e) { box.textContent = e.message; }
 }
 
