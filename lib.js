@@ -89,7 +89,6 @@ export function dotMarker(map, lat, lng) {   // 내 위치: 파란 점
 }
 
 // ── 도착 목록 ──
-export const stopUrl = (s, route = "") => `stop.html?${new URLSearchParams({ city: s.city, id: s.id, name: s.name, lat: s.lat, lng: s.lng, ...(route && { route }) })}`;
 const soon = (r) => (r.minutes != null && r.minutes <= 3) || r.left === 1;
 export function arrivalRows(list, rowTag, attrs = () => "") {   // rowTag: 'a'(눌러 상세로) | 'button'(눌러 버스 위치)
   return list.map((r) => `<${rowTag} class="arr${soon(r) ? " soon" : ""}" ${attrs(r)}><span class="no">${esc(r.route_no)}번</span>
