@@ -97,3 +97,30 @@ export function arrivalRows(list, rowTag, attrs = () => "") {   // rowTag: 'a'(�
     <span class="tm">${r.minutes == null ? "-" : r.minutes + "분"}${soon(r) ? '<span class="soon-tag">곧 도착</span>' : ""}${r.left != null ? `<small>${r.left}정류장 전</small>` : ""}</span></${rowTag}>`).join("");
 }
 export const nowText = () => new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " 기준 · 30초마다 자동 갱신";
+
+// ── 지나간 버스 추정 ──
+// 공공데이터는 도착 예정만 주고 지나간 시각은 안 줌. 이 페이지가 받아 온 값을 비교해, 곧 도착(3분 이내)이던 노선이 목록에서 사라지면 "지나감"으로 보고
+// 지나간 시각을 추정(예정 시각과 사라진 확인 시각 중 이른 쪽). 같은 노선의 도착 예정이 다시 뜨면 지움, 15분 뒤 지움.
+// ponytail: 이 페이지를 열어 둔 동안(탭 안)만 알 수 있고, 일시적으로 정보가 빠져도 지나간 것으로 보일 수 있음. 정확한 기록은 공공데이터에 없음
+const HIST_KEY = "busHist", KEEP_MS = 15 * 60000;
+let hist = (() => { try { return JSON.parse(sessionStorage.getItem(HIST_KEY)) || {}; } catch { return {}; } })();
+const imminent = (r) => (r.minutes != null && r.minutes <= 3) || r.left === 1;
+
+/** 정류장 도착 목록을 받을 때마다 부름 → 지금 "지나감" 표시할 노선 [{route_id, no, dest, at}] 최근 순 */
+export function track(stop, list, now = Date.now()) {
+  const h = (hist[`${stop.city}|${stop.id}`] ??= { prev: {}, passed: {} }), cur = {};
+  for (const r of list) cur[r.route_id] ??= r;   // 노선마다 가장 빠른 버스 (목록이 빠른 순)
+  for (const [id, p] of Object.entries(h.prev)) {
+    if (cur[id] || h.passed[id] || !imminent(p)) continue;
+    h.passed[id] = { no: p.no, dest: p.dest, at: Math.max(p.t, Math.min(now, p.t + (p.minutes ?? 1) * 60000)) };
+  }
+  for (const id of Object.keys(cur)) delete h.passed[id];   // 다음 버스 도착 예정이 뜨면 지나감 정보는 없앰
+  for (const [id, p] of Object.entries(h.passed)) if (now - p.at > KEEP_MS) delete h.passed[id];
+  h.prev = Object.fromEntries(Object.entries(cur).map(([id, r]) => [id, { no: r.route_no, dest: r.dest, minutes: r.minutes, left: r.left, t: now }]));
+  try { sessionStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch { /* 저장 안 돼도 이 화면에선 동작 */ }
+  return Object.entries(h.passed).map(([id, p]) => ({ route_id: id, ...p })).sort((a, b) => b.at - a.at);
+}
+export function passedRows(list, now = Date.now()) {
+  return list.map((p) => { const m = (now - p.at) / 60000;
+    return `<div class="arr gone"><span class="no">${esc(p.no)}번</span><span class="to">${esc(p.dest ? p.dest + " 방면" : "")}</span><span class="tm">${m < 0.75 ? "방금" : Math.round(m) + "분 전"}<small>지나감</small></span></div>`; }).join("");
+}

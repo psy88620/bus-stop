@@ -1,4 +1,4 @@
-import { $, esc, km, nearby, search, arrivals, arrivalsAll, arrivalRows, stopUrl, makeMap, loadKakao, dotMarker, nowText } from "./lib.js";
+import { $, esc, km, nearby, search, arrivals, arrivalsAll, arrivalRows, track, passedRows, stopUrl, makeMap, loadKakao, dotMarker, nowText } from "./lib.js";
 
 let pos = null, stops = [], seq = 0, timer = null, map = null, mapMsg = "";
 const list = $("#list"), where = $("#where");
@@ -21,7 +21,7 @@ function openPop(s, position) {   // 마커 위 말풍선: 페이지 이동 없�
   ["mousedown", "touchstart", "wheel", "dblclick"].forEach((t) => el.addEventListener(t, (e) => e.stopPropagation()));   // 말풍선 위 조작이 지도로 새지 않게
   pop = new kakao.maps.CustomOverlay({ map, position, content: el, yAnchor: 1.18, zIndex: 20 });
   const my = ++popSeq;
-  arrivals(s).then((a) => a.length ? arrivalRows(a.slice(0, 6), "div") : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>', () => '<p class="msg">도착 정보를 받지 못했습니다.</p>')
+  arrivals(s).then((a) => (a.length ? arrivalRows(a.slice(0, 6), "div") : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>') + passedRows(track(s, a)), () => '<p class="msg">도착 정보를 받지 못했습니다.</p>')
     .then((html) => { if (my === popSeq) el.querySelector(".rows").innerHTML = html; });
 }
 function closePop() { popSeq++; if (pop) { pop.setMap(null); pop = null; } }
@@ -39,12 +39,12 @@ async function drawMap(center, fitMe) {   // fitMe: 내 위치 기준일 때만 
   if (stops.length === 1 && !fitMe) map.setLevel(3);
 }
 
-function render(arr) {
+function render(arr, gone = []) {
   list.innerHTML = stops.length ? stops.map((s, i) => {
     const a = arr[i];
     return `<article class="stop"><h2><a href="${esc(stopUrl(s))}">${esc(s.name)}</a> <small>${s.km != null ? Math.round(s.km * 1000) + "m" : esc(s.cityname)}</small></h2>
       ${a === undefined ? '<p class="msg">불러오는 중…</p>' : a === null ? '<p class="msg">도착 정보를 받지 못했습니다.</p>'
-        : a.length ? arrivalRows(a.slice(0, 5), "a", (r) => `href="${esc(stopUrl(s, r.route_id))}"`) : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>'}</article>`;
+        : (a.length ? arrivalRows(a.slice(0, 5), "a", (r) => `href="${esc(stopUrl(s, r.route_id))}"`) : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>') + passedRows(gone[i] || [])}</article>`;
   }).join("") : "";
 }
 
@@ -53,7 +53,7 @@ async function loadArrivals(silent) {
   if (!silent) render([]);
   const arr = await arrivalsAll(stops);
   if (my !== seq) return;
-  render(arr);
+  render(arr, arr.map((a, i) => (a ? track(stops[i], a) : [])));
   $("#at").textContent = nowText();
 }
 

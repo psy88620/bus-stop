@@ -1,4 +1,4 @@
-import { $, esc, cities, cityStops, api, arrivals, arrivalRows, makeMap, dotMarker, nowText } from "./lib.js";
+import { $, esc, cities, cityStops, api, arrivals, arrivalRows, track, passedRows, makeMap, dotMarker, nowText } from "./lib.js";
 
 const q = new URLSearchParams(location.search);
 let stop = { city: +q.get("city"), id: q.get("id"), name: q.get("name") || "", lat: +q.get("lat"), lng: +q.get("lng") };
@@ -27,6 +27,7 @@ async function refresh() {
   where.textContent = "";
   list.innerHTML = arr.length ? arr.map((r) => `<div>${arrivalRows([r], "button", (x) => `data-route="${esc(x.route_id)}" data-no="${esc(x.route_no)}"`)}<div class="loc" hidden></div></div>`).join("")
     : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>';
+  list.insertAdjacentHTML("beforeend", passedRows(track(stop, arr)));   // 지나간 버스(추정)
   $("#at").textContent = nowText();
   const el = openRoute && list.querySelector(`[data-route="${CSS.escape(openRoute)}"]`);
   if (el) showLoc(el); else openRoute = "";
