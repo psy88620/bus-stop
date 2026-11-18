@@ -15,6 +15,24 @@ async function ensureMap(center) {
   return map;
 }
 
+// ── 부드러운 이동: 줌인은 먼저 이동한 뒤 확대, 줌아웃은 먼저 축소한 뒤 이동 (카카오 panTo·setLevel 애니메이션) ──
+const PAN_MS = 350, ZOOM_MS = 500;
+let flyTimer = null, flyUntil = 0;
+function animateTo(center, level) {
+  clearTimeout(flyTimer);
+  const cur = map.getLevel();
+  flyUntil = Date.now() + (level === cur ? PAN_MS : PAN_MS + ZOOM_MS) + 80;
+  if (level === cur) return map.panTo(center);
+  if (level < cur) { map.panTo(center); flyTimer = setTimeout(() => map.setLevel(level, { animate: { duration: ZOOM_MS } }), PAN_MS); }   // 확대
+  else { map.setLevel(level, { animate: { duration: ZOOM_MS } }); flyTimer = setTimeout(() => map.panTo(center), ZOOM_MS); }                // 축소
+}
+function animateFit(fit) {   // fit()이 setBounds로 정할 화면을 먼저 알아낸 뒤, 지금 화면으로 되돌려 놓고 애니메이션으로 이동 (같은 프레임이라 깜빡임 없음)
+  const c0 = map.getCenter(), l0 = map.getLevel();
+  fit(); const c1 = map.getCenter(), l1 = map.getLevel();
+  map.setCenter(c0); map.setLevel(l0);
+  animateTo(c1, l1);
+}
+
 // ── 강조: 목록 ↔ 지도 핀 ──
 function setHl(i) {
   pins.forEach((p, k) => { p.el.classList.toggle("hl", k === i); p.ov.setZIndex(k === i ? 10 : 3); });
@@ -45,7 +63,7 @@ async function drawMap(center, fitMe) {   // fitMe: 내 위치 기준일 때만 
 
 function closeAndRestore() {   // ×·선택된 정류장 다시 누르기: 말풍선을 닫고 처음 화면으로 복귀 (지도 빈 곳 클릭은 보던 화면 유지)
   const was = sel >= 0; closePop();
-  if (was && overview) overview();
+  if (was && overview) animateFit(overview);   // 줌아웃하며 처음 화면으로
 }
 
 // ── 선택: 확대 + 말풍선 ──
@@ -57,7 +75,7 @@ async function select(i, fromList) {
   list.querySelectorAll(".stop").forEach((a) => a.classList.toggle("sel", +a.dataset.i === i));
   pins.forEach((p, k) => p.el.classList.toggle("sel", k === i));   // 선택한 핀은 계속 강조
   const p = new kakao.maps.LatLng(s.lat, s.lng);
-  map.setLevel(2); map.setCenter(p);   // 말풍선 내용이 채워지면 centerPop()이 말풍선+핀을 지도 정중앙으로 맞춤
+  animateTo(p, 2);   // 줌인. 말풍선 내용이 채워지면 centerPop()이 말풍선+핀을 지도 정중앙으로 맞춤
   if (fromList) $("#map").scrollIntoView({ block: "nearest", behavior: "smooth" });   // 폰: 목록이 지도 아래라 지도가 보이게
   else list.querySelector(`.stop[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" });
   openPop(s, p);
@@ -78,6 +96,8 @@ function openPop(s, position) {
 function centerPop() {   // 말풍선+핀 덩어리가 지도 정중앙에 오도록 지도를 움직임 (이미 거의 맞으면 움직이지 않음)
   const w = pop?.getContent().querySelector(".popwrap"), m = $("#map");
   if (!w || !popStop) return;
+  const wait = flyUntil - Date.now();
+  if (wait > 0) { setTimeout(centerPop, wait); return; }   // 줌 애니메이션이 끝난 뒤에 맞춤 (움직이는 중엔 화면 좌표가 틀림)
   const pt = map.getProjection().containerPointFromCoords(new kakao.maps.LatLng(popStop.lat, popStop.lng));   // 핀 끝의 화면 위치
   const H = w.offsetHeight, mh = m.clientHeight, mw = m.clientWidth;
   const ty = Math.min(mh - 20, Math.max(H + 6, mh / 2 + H / 2));   // 덩어리 세로 중앙: 핀 끝은 중앙 + 높이/2 (너무 커서 안 들어가면 맨 위 기준)
@@ -140,7 +160,7 @@ async function showLoc(btn) {
       busOverlays.push(new kakao.maps.CustomOverlay({ map, position: p, content: el, zIndex: 6 }));
     });
     // 버스가 멀면 정류장과 버스가 모두 보이게 맞춤 (화면 밖 표시는 그려지지 않음), 위는 말풍선 자리. 정류장 바로 앞이면 지금 화면 그대로
-    if (buses.slice(0, 3).some((b) => km(popStop.lat, popStop.lng, +b.lat, +b.lng) > 0.08)) map.setBounds(bounds, (pop?.getContent().querySelector(".popwrap").offsetHeight || 260) + 20, 50, 60, 50);
+    if (buses.slice(0, 3).some((b) => km(popStop.lat, popStop.lng, +b.lat, +b.lng) > 0.08)) animateFit(() => map.setBounds(bounds, (pop?.getContent().querySelector(".popwrap").offsetHeight || 260) + 20, 50, 60, 50));
     else centerPop();   // 버스가 바로 앞이면 지도는 그대로 두고 커진 말풍선만 다시 중앙에
   } catch (e) { box.textContent = e.message; }
 }
