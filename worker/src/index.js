@@ -1,6 +1,6 @@
 // 버스 중계 Worker: 공공데이터(TAGO) 키를 숨기고 도착 예정·버스 위치만 대신 받아 줌. 정류장 목록은 페이지의 정적 파일(data/cities)이 맡음.
 //   GET /arrivals?city=34390&stop=GGB...   → [{route_id, route_no, type, dest, minutes, left}] 빠른 순 (15초 캐시)
-//   GET /location?city=&route=&stop=       → [{name, left, lat, lng, vehicle}] 그 정류장으로 오는 버스, 가까운 순 (10초 캐시)
+//   GET /location?city=&route=&stop=       → [{name, left, lat, lng, vehicle}] 노선의 같은 방향 버스, left 오름차순: 음수=지나간 버스, 0 이상=오는 버스 (10초 캐시)
 // 스쿨패스 modules/common/bus.py 와 같은 계산(방면 = 같은 방향의 노선 마지막 정류장).
 const BASE = "https://apis.data.go.kr/1613000";
 const ROUTE_STOPS = `${BASE}/BusRouteInfoInqireService/getRouteAcctoThrghSttnList`;
@@ -68,12 +68,13 @@ export async function arrivals(city, stop, env, ctx) {
 }
 
 export async function location(city, route, stop, env, ctx) {
-  const me = (await routeStops(city, route, env, ctx)).find((x) => x.id === stop);
+  const st = await routeStops(city, route, env, ctx), me = st.find((x) => x.id === stop);
   if (!me) return null;   // 이 정류장에 서지 않는 노선
-  return (await tago(BUS_LOC, { cityCode: city, routeId: route }, env))
-    .map((b) => ({ name: b.nodenm, left: me.ord - b.nodeord, lat: b.gpslati, lng: b.gpslong, vehicle: b.vehicleno || "" }))
-    .filter((b) => b.left >= 0)   // 지나간 버스는 뺌
-    .sort((a, b) => a.left - b.left);
+  // left = 이 정류장까지 남은 정류장 수. 음수는 이미 지나간 버스(-1이면 한 정류장 앞). 같은 진행 방향의 버스만 (반대 방향 구간의 버스는 뺌)
+  return (await tago(BUS_LOC, { cityCode: city, routeId: route }, env)).flatMap((b) => {
+    const at = st.find((x) => x.ord === Number(b.nodeord));
+    return at && at.dir === me.dir ? [{ name: b.nodenm, left: me.ord - Number(b.nodeord), lat: b.gpslati, lng: b.gpslong, vehicle: b.vehicleno || "" }] : [];
+  }).sort((a, b) => a.left - b.left);
 }
 
 export default {

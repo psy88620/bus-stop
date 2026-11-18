@@ -40,5 +40,4 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 syste
 .pop .rows { max-height: 190px; overflow-y: auto; }
 .pop .arr { cursor: default; padding: 6px 2px; } .pop .arr:hover { background: none; }
 .pop .more { display: block; margin-top: 4px; padding: 6px 0 2px; text-align: center; font-size: .85rem; color: var(--accent); text-decoration: none; border-top: 1px solid var(--line); }
-.arr.gone { cursor: default; opacity: .62; } .arr.gone:hover { background: none; } .arr.gone .no { color: var(--muted); }
-.arr.gone .tm { font-weight: 600; }
+.prev { margin: 0 4px 6px 6px; font-size: .8rem; color: var(--muted); } .prev:empty { display: none; }

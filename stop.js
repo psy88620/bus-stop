@@ -1,4 +1,4 @@
-import { $, esc, cities, cityStops, api, arrivals, arrivalRows, track, passedRows, makeMap, dotMarker, nowText } from "./lib.js";
+import { $, esc, cities, cityStops, api, arrivals, arrivalRows, justPassed, makeMap, dotMarker, nowText } from "./lib.js";
 
 const q = new URLSearchParams(location.search);
 let stop = { city: +q.get("city"), id: q.get("id"), name: q.get("name") || "", lat: +q.get("lat"), lng: +q.get("lng") };
@@ -25,12 +25,26 @@ async function init() {
 async function refresh() {
   try { arr = await arrivals(stop); } catch (e) { where.textContent = e.message; return; }
   where.textContent = "";
-  list.innerHTML = arr.length ? arr.map((r) => `<div>${arrivalRows([r], "button", (x) => `data-route="${esc(x.route_id)}" data-no="${esc(x.route_no)}"`)}<div class="loc" hidden></div></div>`).join("")
+  list.innerHTML = arr.length ? arr.map((r) => `<div>${arrivalRows([r], "button", (x) => `data-route="${esc(x.route_id)}" data-no="${esc(x.route_no)}"`)}<div class="loc" hidden></div><div class="prev" data-prev="${esc(r.route_id)}"></div></div>`).join("")
     : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>';
-  list.insertAdjacentHTML("beforeend", passedRows(track(stop, arr)));   // 지나간 버스(추정)
   $("#at").textContent = nowText();
   const el = openRoute && list.querySelector(`[data-route="${CSS.escape(openRoute)}"]`);
   if (el) showLoc(el); else openRoute = "";
+  loadPrev();
+}
+
+let prevSeq = 0;
+async function loadPrev() {   // 노선마다 직전 버스(이미 지나간 버스)를 3곳씩 조회 — 공공데이터 동시 접속 한도 보호
+  const my = ++prevSeq, ids = [...new Set(arr.map((r) => r.route_id))];
+  let next = 0;
+  await Promise.all([0, 1, 2].map(async () => {
+    while (next < ids.length && my === prevSeq) {
+      const id = ids[next++];
+      const p = await api("/location", { city: stop.city, route: id, stop: stop.id }).then(justPassed, () => null);
+      const el = my === prevSeq && list.querySelector(`[data-prev="${CSS.escape(id)}"]`);
+      if (el) el.textContent = p ? `직전 버스는 ${p.stops}정류장 앞(${p.name})을 지나갔어요 · 약 ${p.minutes}분 전 (추정)` : "";
+    }
+  }));
 }
 
 async function showLoc(btn) {   // 노선 버스 위치: 목록 + 지도에 버스 표시
@@ -40,7 +54,7 @@ async function showLoc(btn) {   // 노선 버스 위치: 목록 + 지도에 버�
   box.hidden = false; if (!box.innerHTML) box.textContent = "버스 위치를 불러오는 중…";
   openRoute = btn.dataset.route;
   try {
-    const buses = await api("/location", { city: stop.city, route: openRoute, stop: stop.id });
+    const buses = (await api("/location", { city: stop.city, route: openRoute, stop: stop.id })).filter((b) => b.left >= 0);   // 이 정류장으로 오는 버스만
     box.innerHTML = buses.length ? buses.slice(0, 3).map((b) => `<p>${b.left === 0 ? "<b>지금 이 정류장</b>" : `<b>${b.left}정류장 전</b> · ${esc(b.name)}`}</p>`).join("") : "이 정류장으로 오는 버스 위치가 아직 없습니다.";
     if (map) {
       const bounds = new kakao.maps.LatLngBounds(); bounds.extend(new kakao.maps.LatLng(stop.lat, stop.lng));

@@ -6,6 +6,6 @@ const a = await arrivals("34040", "ASB288000775", env, ctx);   // 아산시청
 console.log("도착", a.length, a[0]);
 console.assert(Array.isArray(a));
 const r = a.find((x) => x.minutes != null) || a[0];
-if (r) { const b = await location("34040", r.route_id, "ASB288000775", env, ctx); console.log("위치", b?.slice(0, 2)); console.assert(b === null || Array.isArray(b)); }
+if (r) { const b = await location("34040", r.route_id, "ASB288000775", env, ctx); console.log("위치", b?.slice(0, 3).map((x) => [x.left, x.name])); console.assert(b === null || (Array.isArray(b) && b.every((x, i) => i === 0 || b[i - 1].left <= x.left)), "left 오름차순"); }
 console.assert((await location("34040", "NOPE12345", "ASB288000775", env, ctx).catch(() => null)) === null);
 console.log("ok");
