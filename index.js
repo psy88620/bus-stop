@@ -2,7 +2,7 @@ import { $, esc, km, nearby, search, api, arrivals, arrivalsAll, arrivalRows, ju
 
 // 한 화면: 목록에 마우스를 올리면 지도 핀 강조, 목록·핀을 누르면 그 정류장으로 확대 + 말풍선(도착·직전 버스·버스 위치)
 let pos = null, stops = [], seq = 0, timer = null, map = null, mapMsg = "";
-let pins = [], overlays = [], sel = -1, pop = null, popSeq = 0, popTimer = null, openRoute = "", busOverlays = [], popStop = null;
+let centered = false, overview = null, pins = [], overlays = [], sel = -1, pop = null, popSeq = 0, popTimer = null, openRoute = "", busOverlays = [], popStop = null;
 const list = $("#list"), where = $("#where");
 const say = (t) => (where.textContent = t);
 const place = (s) => (s.km != null ? Math.round(s.km * 1000) + "m" : esc(s.cityname));
@@ -36,20 +36,28 @@ async function drawMap(center, fitMe) {   // fitMe: 내 위치 기준일 때만 
     pins.push({ el, ov: new kakao.maps.CustomOverlay({ map, position: p, content: el, xAnchor: 0.5, yAnchor: 1.2, zIndex: 3 }) });
     bounds.extend(p);
   });
-  if (stops.length || fitMe) map.setBounds(bounds, 40, 40, 40, 40);
-  if (stops.length === 1 && !fitMe) map.setLevel(3);
+  overview = () => {   // 처음 화면(내 주변 / 검색 결과 전체) — 말풍선을 닫을 때 돌아옴
+    if (stops.length || fitMe) map.setBounds(bounds, 40, 40, 40, 40);
+    if (stops.length === 1 && !fitMe) map.setLevel(3);
+  };
+  overview();
+}
+
+function closeAndRestore() {   // ×·선택된 정류장 다시 누르기: 말풍선을 닫고 처음 화면으로 복귀 (지도 빈 곳 클릭은 보던 화면 유지)
+  const was = sel >= 0; closePop();
+  if (was && overview) overview();
 }
 
 // ── 선택: 확대 + 말풍선 ──
 async function select(i, fromList) {
   if (!map) return say(mapMsg || "지도를 불러오는 중입니다.");
+  if (i === sel) return closeAndRestore();   // 이미 선택된 정류장을 다시 누르면 닫고 처음 화면으로
   const s = stops[i];
   closePop(); sel = i;
   list.querySelectorAll(".stop").forEach((a) => a.classList.toggle("sel", +a.dataset.i === i));
   pins.forEach((p, k) => p.el.classList.toggle("sel", k === i));   // 선택한 핀은 계속 강조
   const p = new kakao.maps.LatLng(s.lat, s.lng);
-  map.setLevel(2); map.setCenter(p);
-  map.panBy(0, -Math.min(150, $("#map").clientHeight * 0.3));   // 말풍선이 핀 위에 들어갈 자리를 위해 핀을 화면 아래쪽으로
+  map.setLevel(2); map.setCenter(p);   // 말풍선 내용이 채워지면 centerPop()이 말풍선+핀을 지도 정중앙으로 맞춤
   if (fromList) $("#map").scrollIntoView({ block: "nearest", behavior: "smooth" });   // 폰: 목록이 지도 아래라 지도가 보이게
   else list.querySelector(`.stop[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" });
   openPop(s, p);
@@ -59,12 +67,22 @@ function openPop(s, position) {
   // 크기 0의 기준점(.popanchor)에 아래 모서리를 붙임: 내용이 채워져 말풍선이 커져도 핀 위치에서 위로만 늘어남. 아래 여백(.popwrap padding) = 핀이 들어갈 자리
   const el = document.createElement("div"); el.className = "popanchor";
   el.innerHTML = `<div class="popwrap"><div class="pop"><button class="x" type="button" aria-label="닫기">×</button><h3>${esc(s.name)} <small>${place(s)}</small></h3><div class="rows"><p class="msg">불러오는 중…</p></div></div></div>`;
-  el.querySelector(".x").addEventListener("click", closePop);
+  el.querySelector(".x").addEventListener("click", closeAndRestore);
   el.addEventListener("click", (e) => { const b = e.target.closest("[data-route]"); if (b) toggleRoute(b); });
   stopProp(el);
-  popStop = s; openRoute = "";
+  popStop = s; openRoute = ""; centered = false;
   pop = new kakao.maps.CustomOverlay({ map, position, content: el, xAnchor: 0, yAnchor: 0, zIndex: 20 });
   fillPop(); popTimer = setInterval(() => { if (!document.hidden) fillPop(); }, 30000);
+}
+
+function centerPop() {   // 말풍선+핀 덩어리가 지도 정중앙에 오도록 지도를 움직임 (이미 거의 맞으면 움직이지 않음)
+  const w = pop?.getContent().querySelector(".popwrap"), m = $("#map");
+  if (!w || !popStop) return;
+  const pt = map.getProjection().containerPointFromCoords(new kakao.maps.LatLng(popStop.lat, popStop.lng));   // 핀 끝의 화면 위치
+  const H = w.offsetHeight, mh = m.clientHeight, mw = m.clientWidth;
+  const ty = Math.min(mh - 20, Math.max(H + 6, mh / 2 + H / 2));   // 덩어리 세로 중앙: 핀 끝은 중앙 + 높이/2 (너무 커서 안 들어가면 맨 위 기준)
+  const dx = pt.x - mw / 2, dy = pt.y - ty;
+  if (Math.abs(dx) > 12 || Math.abs(dy) > 12) map.panBy(dx, dy);
 }
 
 function closePop() {
@@ -82,6 +100,7 @@ async function fillPop() {   // 도착 예정 + 노선별 직전 버스 (30초�
   if (my !== popSeq) return;
   box.innerHTML = a.length ? a.slice(0, 8).map((r) => `<div class="rt">${arrivalRows([r], "button", (x) => `data-route="${esc(x.route_id)}" data-no="${esc(x.route_no)}"`)}<div class="loc" hidden></div><div class="prev" data-prev="${esc(r.route_id)}"></div></div>`).join("")
     : '<p class="none">지금 도착 예정인 버스가 없습니다.</p>';
+  if (!centered) { centered = true; centerPop(); }
   const el = openRoute && box.querySelector(`[data-route="${CSS.escape(openRoute)}"]`);
   if (el) showLoc(el); else openRoute = "";
   // 노선마다 직전 버스(이미 지나간 버스): 3곳씩 조회 — 공공데이터 동시 접속 한도 보호
@@ -94,6 +113,7 @@ async function fillPop() {   // 도착 예정 + 노선별 직전 버스 (30초�
       if (t) t.textContent = p ? `직전 버스는 ${p.stops}정류장 앞(${p.name})을 지나갔어요 · 약 ${p.minutes}분 전 (추정)` : "";
     }
   }));
+  if (my === popSeq && !openRoute) centerPop();   // 직전 버스 줄이 채워져 말풍선이 커진 뒤 다시 정중앙으로
 }
 
 function clearBuses() { busOverlays.forEach((o) => o.setMap(null)); busOverlays = []; }
@@ -121,6 +141,7 @@ async function showLoc(btn) {
     });
     // 버스가 멀면 정류장과 버스가 모두 보이게 맞춤 (화면 밖 표시는 그려지지 않음), 위는 말풍선 자리. 정류장 바로 앞이면 지금 화면 그대로
     if (buses.slice(0, 3).some((b) => km(popStop.lat, popStop.lng, +b.lat, +b.lng) > 0.08)) map.setBounds(bounds, (pop?.getContent().querySelector(".popwrap").offsetHeight || 260) + 20, 50, 60, 50);
+    else centerPop();   // 버스가 바로 앞이면 지도는 그대로 두고 커진 말풍선만 다시 중앙에
   } catch (e) { box.textContent = e.message; }
 }
 

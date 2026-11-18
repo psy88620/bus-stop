@@ -51,4 +51,4 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 syste
 .pin.hl, .pin.sel { background: var(--warn); transform: rotate(-45deg) scale(1.4); }
 .pop .rt .arr { cursor: pointer; } .pop .rt .arr:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .popanchor { position: relative; width: 0; height: 0; }
-.popwrap { position: absolute; left: 0; bottom: 0; transform: translateX(-50%); padding-bottom: 46px; pointer-events: none; } .popwrap .pop { pointer-events: auto; }
+.popwrap { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; position: absolute; left: 0; bottom: 0; transform: translateX(-50%); padding-bottom: 46px; pointer-events: none; } .popwrap .pop { pointer-events: auto; }
