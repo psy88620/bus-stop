@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 주변 버스</title>
+<meta name="description" content="내 위치 근처 버스정류장과 실시간 도착 정보, 전국 정류장 검색">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><h1>내 주변 버스</h1><button id="gps" class="btn" type="button">내 위치로 찾기</button></header>
+<form id="search" class="search" role="search">
+  <input id="region" class="input" maxlength="10" placeholder="도시 (아산)" aria-label="도시 이름 (필수)" autocomplete="off" required>
+  <input id="area" class="input" maxlength="10" placeholder="읍·면·리 (선택)" aria-label="읍 면 리 이름 (선택)" autocomplete="off">
+  <input id="q" type="search" class="input grow" maxlength="20" placeholder="정류장 이름 (시청)" aria-label="정류장 이름" enterkeyhint="search">
+  <button class="btn primary" type="submit">검색</button>
+</form>
+<p id="where" class="where" aria-live="polite"></p>
+<main class="layout">
+  <section id="list" class="list" aria-live="polite" aria-label="정류장 목록"></section>
+  <div id="map" class="map" role="region" aria-label="지도"></div>
+</main>
+<p class="src"><span id="at"></span><br>출처: 국토교통부 · 도착 시간은 예상이며 달라질 수 있습니다</p>
+<script type="module" src="index.js"></script>
+</body>
+</html>

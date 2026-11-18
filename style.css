@@ -1,0 +1,35 @@
+:root { --bg: #f6f7f9; --surface: #fff; --ink: #14181f; --ink-2: #4a5360; --muted: #6b7482; --line: #dfe3e9; --accent: #1668d6; --warn: #d9480f; --r: 10px; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f1216; --surface: #181d24; --ink: #eceff3; --ink-2: #b4bcc8; --muted: #8b95a3; --line: #2a313b; --accent: #5aa2ff; --warn: #ff8a5c; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.top { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+.top h1 { flex: 1; margin: 0; font-size: 1.1rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn { font: inherit; font-size: .9rem; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:focus-visible, .input:focus-visible, a:focus-visible, .arr:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.search { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
+.input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); width: 7.5em; min-width: 0; }
+#area { width: 9.5em; }
+.input.grow { flex: 1; width: auto; min-width: 8em; }
+.where { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: .9rem; min-height: 1.5em; }
+.layout { display: flex; flex-direction: column-reverse; gap: 12px; padding: 0 16px 16px; }   /* 폰: 지도가 위, 목록이 아래 */
+.map { height: 44vh; min-height: 260px; border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; background: var(--surface); }
+.list { min-width: 0; }
+@media (min-width: 900px) { .layout { flex-direction: row; align-items: flex-start; } .list { width: 430px; flex: none; } .map { flex: 1; height: calc(100vh - 190px); position: sticky; top: 64px; } }
+.stop { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; margin-bottom: 10px; }
+.stop h2 { margin: 0 0 4px; font-size: 1rem; } .stop h2 a { color: var(--ink); text-decoration: none; } .stop h2 a:hover { text-decoration: underline; } .stop h2 small { color: var(--muted); font-weight: 400; }
+.arr { display: grid; grid-template-columns: 4.2em 1fr auto; gap: 8px; align-items: center; width: 100%; padding: 8px 6px; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; border-radius: 6px; }
+.arr:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.arr .no { font-weight: 700; color: var(--accent); }
+.arr .to { font-size: .9rem; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arr .tm { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.arr .tm small { display: block; font-weight: 400; color: var(--muted); font-size: .75rem; }
+.arr.soon .tm { color: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+.soon-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: var(--surface); font-size: .7rem; }
+@keyframes pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .arr.soon .tm { animation: none; } }
+.loc { margin: 0 4px 6px; padding: 6px 10px; border-left: 3px solid var(--accent); font-size: .9rem; } .loc p { margin: 2px 0; }
+.none, .msg { color: var(--muted); font-size: .9rem; margin: 6px 4px; }
+.src { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 16px 24px; }
+.me-dot { width: 16px; height: 16px; border-radius: 50%; background: #1668d6; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(22,104,214,.3); transform: translate(-50%, -50%); }
+.bus-pin { padding: 2px 8px; border-radius: 999px; background: var(--warn); color: #fff; font: 700 .8rem system-ui; border: 2px solid #fff; transform: translate(-50%, -50%); white-space: nowrap; }

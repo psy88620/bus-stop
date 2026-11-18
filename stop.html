@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>정류장 실시간 정보</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><a class="btn" href="index.html" aria-label="목록으로">← 목록</a><h1 id="name">정류장</h1><button id="refresh" class="btn" type="button">새로고침</button></header>
+<p id="where" class="where" aria-live="polite"></p>
+<main class="layout">
+  <section id="list" class="list" aria-live="polite" aria-label="도착 예정"></section>
+  <div id="map" class="map" role="region" aria-label="지도"></div>
+</main>
+<p class="src"><span id="at"></span><br>출처: 국토교통부 · 도착 시간은 예상이며 달라질 수 있습니다</p>
+<script type="module" src="stop.js"></script>
+</body>
+</html>

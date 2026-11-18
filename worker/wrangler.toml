@@ -1,0 +1,8 @@
+name = "bus-stop-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# 이 주소에서 오는 요청만 허용 (CORS). 쉼표로 여러 개
+ALLOWED_ORIGINS = "https://psy88620.github.io,http://localhost:8080"
+# 비밀값(공공데이터 키)은 파일에 넣지 말고: npx wrangler secret put DATA_GO_KR_KEY
