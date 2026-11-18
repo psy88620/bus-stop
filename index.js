@@ -12,18 +12,18 @@ async function ensureMap(center) {
 }
 
 let overlays = [];
-async function drawMap(center) {
+async function drawMap(center, fitMe) {   // fitMe: 내 위치 기준일 때만 지도 범위에 내 위치를 넣음(검색은 결과 정류장만)
   if (!(await ensureMap(center))) return;
   overlays.forEach((o) => o.setMap(null)); overlays = [];
   const bounds = new kakao.maps.LatLngBounds();
-  if (pos) { overlays.push(dotMarker(map, pos.lat, pos.lng)); bounds.extend(new kakao.maps.LatLng(pos.lat, pos.lng)); }
+  if (pos) { overlays.push(dotMarker(map, pos.lat, pos.lng)); if (fitMe) bounds.extend(new kakao.maps.LatLng(pos.lat, pos.lng)); }
   stops.forEach((s) => {
     const p = new kakao.maps.LatLng(s.lat, s.lng), m = new kakao.maps.Marker({ map, position: p, title: s.name });
     kakao.maps.event.addListener(m, "click", () => { location.href = stopUrl(s); });   // 정류장을 누르면 실시간 정보 페이지로
     overlays.push(m); bounds.extend(p);
   });
-  if (stops.length || pos) map.setBounds(bounds, 40, 40, 40, 40);
-  if (stops.length === 1 && !pos) map.setLevel(3);
+  if (stops.length || fitMe) map.setBounds(bounds, 40, 40, 40, 40);
+  if (stops.length === 1 && !fitMe) map.setLevel(3);
 }
 
 function render(arr) {
@@ -44,11 +44,11 @@ async function loadArrivals(silent) {
   $("#at").textContent = nowText();
 }
 
-async function show(found, title, center) {
+async function show(found, title, center, fitMe) {
   stops = found;
   say(stops.length ? title : title + " — 정류장을 찾지 못했습니다.");
   list.innerHTML = ""; $("#at").textContent = "";
-  await drawMap(center || pos || { lat: 37.5665, lng: 126.978 });
+  await drawMap(center || pos || { lat: 37.5665, lng: 126.978 }, fitMe);
   if (!stops.length) return;
   await loadArrivals();
   clearInterval(timer);
