@@ -150,17 +150,24 @@ async function showLoc(btn) {
   box.hidden = false; if (!box.innerHTML) box.textContent = "버스 위치를 불러오는 중…";
   openRoute = btn.dataset.route;
   try {
-    const buses = (await api("/location", { city: popStop.city, route: openRoute, stop: popStop.id })).filter((b) => b.left >= 0);   // 이 정류장으로 오는 버스만
+    const q = { city: popStop.city, route: openRoute, stop: popStop.id };
+    const [locs, line] = await Promise.all([api("/location", q), api("/route", q).catch(() => [])]);   // 노선도는 실패해도 버스 위치는 보여 줌
+    const buses = locs.filter((b) => b.left >= 0);   // 이 정류장으로 오는 버스만
     if (my !== popSeq && !pop) return;
     box.innerHTML = buses.length ? buses.slice(0, 3).map((b) => `<p>${b.left === 0 ? "<b>지금 이 정류장</b>" : `<b>${b.left}정류장 전</b> · ${esc(b.name)}`}</p>`).join("") : "이 정류장으로 오는 버스 위치가 아직 없습니다.";
     const bounds = new kakao.maps.LatLngBounds(); bounds.extend(new kakao.maps.LatLng(popStop.lat, popStop.lng));
+    if (line.length > 1) {   // 노선도: 노선 선 + 정류장 점 (버스 핀 아래), 지도는 노선 전체가 보이게
+      const path = line.map((x) => new kakao.maps.LatLng(x.lat, x.lng)); path.forEach((p) => bounds.extend(p));
+      busOverlays.push(new kakao.maps.Polyline({ map, path, strokeWeight: 5, strokeColor: "#1668d6", strokeOpacity: 0.7 }));
+      line.forEach((x, k) => { const d = document.createElement("div"); d.className = "route-dot"; d.title = x.name; busOverlays.push(new kakao.maps.CustomOverlay({ map, position: path[k], content: d, zIndex: 4 })); });
+    }
     buses.slice(0, 3).forEach((b) => {
       const el = document.createElement("div"); el.className = "bus-pin"; el.textContent = btn.dataset.no;
       const p = new kakao.maps.LatLng(b.lat, b.lng); bounds.extend(p);
       busOverlays.push(new kakao.maps.CustomOverlay({ map, position: p, content: el, zIndex: 6 }));
     });
     // 버스가 멀면 정류장과 버스가 모두 보이게 맞춤 (화면 밖 표시는 그려지지 않음), 위는 말풍선 자리. 정류장 바로 앞이면 지금 화면 그대로
-    if (buses.slice(0, 3).some((b) => km(popStop.lat, popStop.lng, +b.lat, +b.lng) > 0.08)) animateFit(() => map.setBounds(bounds, (pop?.getContent().querySelector(".popwrap").offsetHeight || 260) + 20, 50, 60, 50));
+    if (line.length > 1 || buses.slice(0, 3).some((b) => km(popStop.lat, popStop.lng, +b.lat, +b.lng) > 0.08)) animateFit(() => map.setBounds(bounds, (pop?.getContent().querySelector(".popwrap").offsetHeight || 260) + 20, 50, 60, 50));
     else centerPop();   // 버스가 바로 앞이면 지도는 그대로 두고 커진 말풍선만 다시 중앙에
   } catch (e) { box.textContent = e.message; }
 }

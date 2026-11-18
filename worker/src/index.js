@@ -1,5 +1,6 @@
 // 버스 중계 Worker: 공공데이터(TAGO) 키를 숨기고 도착 예정·버스 위치만 대신 받아 줌. 정류장 목록은 페이지의 정적 파일(data/cities)이 맡음.
 //   GET /arrivals?city=34390&stop=GGB...   → [{route_id, route_no, type, dest, minutes, left}] 빠른 순 (15초 캐시)
+//   GET /route?city=&route=&stop=          → [{id, name, ord, lat, lng}] 이 정류장 기준 같은 진행 방향의 노선 정류장 순서 (하루 캐시)
 //   GET /location?city=&route=&stop=       → [{name, left, lat, lng, vehicle}] 노선의 같은 방향 버스, left 오름차순: 음수=지나간 버스, 0 이상=오는 버스 (10초 캐시)
 // 스쿨패스 modules/common/bus.py 와 같은 계산(방면 = 같은 방향의 노선 마지막 정류장).
 const BASE = "https://apis.data.go.kr/1613000";
@@ -38,11 +39,11 @@ async function cached(request, ttl, make) {
 }
 
 async function routeStops(city, routeId, env, ctx) {   // 노선 정류장 순서 (하루 캐시)
-  const key = new Request(`https://cache.invalid/route/${city}/${routeId}`);
+  const key = new Request(`https://cache.invalid/route2/${city}/${routeId}`);
   const hit = await caches.default.match(key);
   if (hit) return hit.json();
   const out = (await tago(ROUTE_STOPS, { cityCode: city, routeId }, env))
-    .map((i) => ({ id: i.nodeid, name: i.nodenm, ord: i.nodeord, dir: i.updowncd }))
+    .map((i) => ({ id: i.nodeid, name: i.nodenm, ord: i.nodeord, dir: i.updowncd, lat: i.gpslati, lng: i.gpslong }))
     .sort((a, b) => a.ord - b.ord);
   ctx.waitUntil(caches.default.put(key, new Response(JSON.stringify(out), { headers: { "cache-control": "public, max-age=86400" } })));
   return out;
@@ -77,6 +78,11 @@ export async function location(city, route, stop, env, ctx) {
   }).sort((a, b) => a.left - b.left);
 }
 
+export async function routeLine(city, route, stop, env, ctx) {
+  const st = await routeStops(city, route, env, ctx), me = st.find((x) => x.id === stop);
+  return me ? st.filter((x) => x.dir === me.dir && x.lat != null && x.lng != null).map(({ id, name, ord, lat, lng }) => ({ id, name, ord, lat: +lat, lng: +lng })) : null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get("origin") || "";
@@ -87,7 +93,7 @@ export default {
     if (!ok) return json({ error: "허용되지 않은 주소입니다." }, 403);
     const q = new URL(request.url).searchParams, path = new URL(request.url).pathname;
     const city = q.get("city") || "", stop = q.get("stop") || "", route = q.get("route") || "";
-    if (!/^\d{1,6}$/.test(city) || !ID.test(stop) || (path === "/location" && !ID.test(route))) return json({ error: "요청 값이 올바르지 않습니다." }, 400);
+    if (!/^\d{1,6}$/.test(city) || !ID.test(stop) || (path !== "/arrivals" && !ID.test(route))) return json({ error: "요청 값이 올바르지 않습니다." }, 400);
     try {
       let res;
       if (path === "/arrivals") res = await cached(request, 15, () => arrivals(city, stop, env, ctx));
@@ -95,6 +101,11 @@ export default {
         const b = await location(city, route, stop, env, ctx);
         if (!b) throw Object.assign(new Error("이 정류장에 서지 않는 노선입니다."), { status: 400 });
         return b;
+      });
+      else if (path === "/route") res = await cached(request, 3600, async () => {
+        const l = await routeLine(city, route, stop, env, ctx);
+        if (!l) throw Object.assign(new Error("이 정류장에 서지 않는 노선입니다."), { status: 400 });
+        return l;
       });
       else return json({ error: "없는 주소입니다." }, 404);
       const h = new Headers(res.headers); Object.entries(cors).forEach(([k, v]) => h.set(k, v));
